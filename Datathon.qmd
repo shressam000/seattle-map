@@ -1,0 +1,76 @@
+---
+title: "Government: Analyzing the Seattle Resident's Customer Requests"
+format: html
+editor: visual
+---
+
+```{r}
+install.packages("leaflet")
+install.packages("dplyr")
+install.packages("sf")
+install.packages("readr")
+install.packages("htmlwidgets")
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(readr)
+library(leaflet)
+library(htmlwidgets)
+
+# 1. Load your dataset
+file_path <- "Customer_Service_Requests_20250426.csv"
+df <- read_csv(file_path, show_col_types = FALSE)
+
+# 2. Clean the data
+df_clean <- df %>%
+  filter(!is.na(Latitude), !is.na(Longitude))
+
+# 3. SAMPLE only 10,000 service requests
+set.seed(42)  # Reproducibility
+df_sample <- df_clean %>%
+  sample_n(10000)
+
+# 4. Build the Clustered Map using sampled service requests
+map_cluster_requests_sampled <- leaflet(df_sample) %>%
+  addProviderTiles(providers$OpenStreetMap.Mapnik) %>%
+  addMarkers(
+    lng = ~Longitude,
+    lat = ~Latitude,
+    label = ~paste0("Neighborhood: ", Neighborhood),
+    popup = ~paste0(
+      "<strong>Service Request</strong><br>",
+      "<strong>Neighborhood:</strong> ", Neighborhood, "<br>",
+      "<strong>Method Received:</strong> ", `Method Received`, "<br>",
+      "<strong>Status:</strong> ", Status
+    ),
+    clusterOptions = markerClusterOptions(
+      iconCreateFunction = JS("
+        function (cluster) {
+          var childCount = cluster.getChildCount();
+          var c = ' marker-cluster-';
+          if (childCount < 100) {
+            c += 'small';
+          } else if (childCount < 500) {
+            c += 'medium';
+          } else {
+            c += 'large';
+          }
+          return new L.DivIcon({ 
+            html: '<div><span>' + childCount + '</span></div>', 
+            className: 'marker-cluster' + c, 
+            iconSize: new L.Point(40, 40)
+          });
+        }
+      ")
+    )
+  ) %>%
+  setView(lng = -122.3321, lat = 47.6062, zoom = 11)
+
+# 5. Show map
+map_cluster_requests_sampled
+
+# 6. Save map
+saveWidget(map_cluster_requests_sampled, "seattle_service_requests_map")
+```
